@@ -1,0 +1,86 @@
+service: olist-analytics-pipeline
+
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  runtime: python3.11
+  region: us-east-1
+  stage: ${opt:stage, 'dev'}
+  environment:
+    BUCKET_NAME: ${self:custom.bucketName}
+    GLUE_JOB_NAME: ${self:custom.glueJobName}
+
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - s3:*
+          Resource:
+            - arn:aws:s3:::${self:custom.bucketName}
+            - arn:aws:s3:::${self:custom.bucketName}/*
+        - Effect: Allow
+          Action:
+            - glue:StartJobRun
+            - glue:GetJobRun
+          Resource: '*'
+        - Effect: Allow
+          Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+          Resource: '*'
+
+package:
+  individually: false
+  patterns:
+    - '!**/*'
+    - 'lambda/**'
+    - '!lambda/**/__pycache__/**'
+    - '!lambda/**/*.pyc'
+
+custom:
+  bucketName: olist-datalake-unisenai-${self:provider.stage}
+  glueJobName: olist-etl-${self:provider.stage}
+
+functions:
+  ingest:
+    handler: lambda/ingest/handler.lambda_handler
+    timeout: 300
+    memorySize: 512
+    events:
+      - schedule:
+          name: olist-daily-schedule
+          description: 'Execução diária às 02:00 UTC'
+          rate: cron(0 2 * * ? *)
+          enabled: true
+
+resources:
+  Resources:
+    DataLakeBucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: ${self:custom.bucketName}
+        PublicAccessBlockConfiguration:
+          BlockPublicAcls: true
+          BlockPublicPolicy: true
+          IgnorePublicAcls: true
+          RestrictPublicBuckets: true
+        VersioningConfiguration:
+          Status: Enabled
+        LifecycleConfiguration:
+          Rules:
+            - Id: DeleteOldMetadata
+              Status: Enabled
+              Prefix: raw/_metadata/
+              ExpirationInDays: 30
+
+  Outputs:
+    BucketName:
+      Value: !Ref DataLakeBucket
+      Description: Nome do S3 Bucket do Data Lake
+    
+    BucketArn:
+      Value: !GetAtt DataLakeBucket.Arn
+      Description: ARN do S3 Bucket

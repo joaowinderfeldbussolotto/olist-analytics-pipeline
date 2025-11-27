@@ -1,0 +1,37 @@
+# Exclude virtual environments
+venv/
+.venv/
+env/
+.env/
+
+# Exclude AWS CLI installation
+aws/
+
+# Exclude development files
+.git/
+.gitignore
+.serverless/
+*.pyc
+__pycache__/
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Exclude documentation and non-essential files
+README.md
+*.md
+.vscode/
+.idea/
+
+# Exclude test files
+tests/
+test_*.py
+*_test.py
