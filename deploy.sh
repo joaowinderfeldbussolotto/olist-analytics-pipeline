@@ -42,20 +42,7 @@ npx serverless deploy --stage $STAGE
 # FASE 2: AWS CDK
 # ==============================================================================
 echo ""
-echo -e "${GREEN}[3/4]${NC} Configurando ambiente Python para CDK..."
-
-# Criar venv se não existir
-if [ ! -d "cdk/.venv" ]; then
-    echo "       Criando virtual environment..."
-    python3 -m venv cdk/.venv
-fi
-
-# Ativar venv e instalar dependências
-source cdk/.venv/bin/activate
-pip install -q -r cdk/requirements.txt
-
-echo ""
-echo -e "${GREEN}[4/4]${NC} Fazendo deploy do CDK..."
+echo -e "${GREEN}[3/4]${NC} Fazendo deploy do CDK..."
 echo -e "${YELLOW}       (Glue Database, Glue Crawler)${NC}"
 
 cd cdk
@@ -65,12 +52,11 @@ echo "       Verificando bootstrap do CDK..."
 cdk bootstrap --context stage=$STAGE 2>/dev/null || true
 
 # Deploy
+echo ""
+echo -e "${GREEN}[4/4]${NC} Deploy CDK..."
 cdk deploy --context stage=$STAGE --require-approval never
 
 cd ..
-
-# Desativar venv
-deactivate
 
 # ==============================================================================
 # CONCLUSÃO
