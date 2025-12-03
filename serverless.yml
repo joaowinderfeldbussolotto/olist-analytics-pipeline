@@ -125,6 +125,46 @@ resources:
               Status: Enabled
               ExpirationInDays: 30
 
+    # =====================================================
+    # GLUE DATABASE
+    # =====================================================
+    OlistGlueDatabase:
+      Type: AWS::Glue::Database
+      Properties:
+        CatalogId: !Ref AWS::AccountId
+        DatabaseInput:
+          Name: olist_datalake_${self:provider.stage}
+          Description: Database do Data Lake Olist - Camada Processed
+          LocationUri: s3://${self:custom.bucketName}/processed/
+
+    # =====================================================
+    # GLUE CRAWLER
+    # =====================================================
+    OlistProcessedCrawler:
+      Type: AWS::Glue::Crawler
+      DependsOn: OlistGlueDatabase
+      Properties:
+        Name: olist-processed-crawler-${self:provider.stage}
+        Role: arn:aws:iam::${aws:accountId}:role/LabRole
+        DatabaseName: olist_datalake_${self:provider.stage}
+        Description: Crawler para catalogar dados processados do Olist
+        Targets:
+          S3Targets:
+            - Path: s3://${self:custom.bucketName}/processed/
+              Exclusions:
+                - '**/_temporary/**'
+                - '**/_spark_metadata/**'
+                - '**/.spark-staging/**'
+        SchemaChangePolicy:
+          UpdateBehavior: UPDATE_IN_DATABASE
+          DeleteBehavior: LOG
+        RecrawlPolicy:
+          RecrawlBehavior: CRAWL_EVERYTHING
+        TablePrefix: 'olist_'
+        Tags:
+          Project: Olist
+          Environment: ${self:provider.stage}
+
   Outputs:
     BucketName:
       Value: !Ref DataLakeBucket
@@ -153,3 +193,11 @@ resources:
     GlueRoleArn:
       Value: arn:aws:iam::${aws:accountId}:role/LabRole
       Description: ARN da IAM Role do Glue Job (LabRole)
+    
+    GlueDatabaseName:
+      Value: olist_datalake_${self:provider.stage}
+      Description: Nome do Glue Database
+    
+    GlueCrawlerName:
+      Value: !Ref OlistProcessedCrawler
+      Description: Nome do Glue Crawler
