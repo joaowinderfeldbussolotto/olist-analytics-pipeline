@@ -12,25 +12,7 @@ provider:
     GLUE_JOB_NAME: ${self:custom.glueJobName}
 
   iam:
-    role:
-      statements:
-        - Effect: Allow
-          Action:
-            - s3:*
-          Resource:
-            - arn:aws:s3:::${self:custom.bucketName}
-            - arn:aws:s3:::${self:custom.bucketName}/*
-        - Effect: Allow
-          Action:
-            - glue:StartJobRun
-            - glue:GetJobRun
-          Resource: '*'
-        - Effect: Allow
-          Action:
-            - logs:CreateLogGroup
-            - logs:CreateLogStream
-            - logs:PutLogEvents
-          Resource: '*'
+    role: arn:aws:iam::${aws:accountId}:role/LabRole
 
 plugins:
   - serverless-glue
@@ -49,7 +31,7 @@ custom:
   glueJobName: olist-etl-${self:provider.stage}
   redshiftWorkgroup: olist-redshift-workgroup
   redshiftDatabase: olistdb
-  glueRoleArn: !GetAtt OlistGlueRole.Arn
+  glueRoleArn: arn:aws:iam::${aws:accountId}:role/LabRole
   
 functions:
   ingest:
@@ -125,69 +107,6 @@ resources:
               Status: Enabled
               Prefix: logs/
               ExpirationInDays: 7
-    
-    # IAM Role para Glue Job
-    OlistGlueRole:
-      Type: AWS::IAM::Role
-      Properties:
-        RoleName: OlistGlueRole-${self:provider.stage}
-        AssumeRolePolicyDocument:
-          Version: '2012-10-17'
-          Statement:
-            - Effect: Allow
-              Principal:
-                Service: glue.amazonaws.com
-              Action: sts:AssumeRole
-        ManagedPolicyArns:
-          - arn:aws:iam::aws:policy/service-role/AWSGlueServiceRole
-        Policies:
-          - PolicyName: OlistGluePolicy
-            PolicyDocument:
-              Version: '2012-10-17'
-              Statement:
-                # S3 Access - Data Lake
-                - Effect: Allow
-                  Action:
-                    - s3:GetObject
-                    - s3:PutObject
-                    - s3:DeleteObject
-                    - s3:ListBucket
-                  Resource:
-                    - arn:aws:s3:::${self:custom.bucketName}
-                    - arn:aws:s3:::${self:custom.bucketName}/*
-                
-                # S3 Access - Glue Scripts
-                - Effect: Allow
-                  Action:
-                    - s3:GetObject
-                    - s3:PutObject
-                    - s3:DeleteObject
-                    - s3:ListBucket
-                  Resource:
-                    - arn:aws:s3:::${self:custom.glueScriptsBucket}
-                    - arn:aws:s3:::${self:custom.glueScriptsBucket}/*
-                
-                # Bedrock Access (para análise de sentimento)
-                - Effect: Allow
-                  Action:
-                    - bedrock:InvokeModel
-                  Resource: '*'
-                
-                # Redshift Data API Access
-                - Effect: Allow
-                  Action:
-                    - redshift-data:ExecuteStatement
-                    - redshift-data:DescribeStatement
-                    - redshift-data:GetStatementResult
-                  Resource: '*'
-                
-                # CloudWatch Logs
-                - Effect: Allow
-                  Action:
-                    - logs:CreateLogGroup
-                    - logs:CreateLogStream
-                    - logs:PutLogEvents
-                  Resource: '*'
 
   Outputs:
     BucketName:
@@ -207,5 +126,5 @@ resources:
       Description: Nome do Glue Job
     
     GlueRoleArn:
-      Value: !GetAtt OlistGlueRole.Arn
-      Description: ARN da IAM Role do Glue Job
+      Value: arn:aws:iam::${aws:accountId}:role/LabRole
+      Description: ARN da IAM Role do Glue Job (LabRole)

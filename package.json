@@ -1,0 +1,15 @@
+{
+  "name": "olist-analytics-pipeline",
+  "version": "1.0.0",
+  "description": "Pipeline Big Data Olist",
+  "scripts": {
+    "deploy": "serverless deploy --verbose",
+    "remove": "serverless remove",
+    "logs": "serverless logs -f ingest -t",
+    "invoke": "serverless invoke -f ingest"
+  },
+  "devDependencies": {
+    "serverless": "^3.38.0",
+    "serverless-glue": "^2.2.0"
+  }
+}
