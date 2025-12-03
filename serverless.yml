@@ -28,6 +28,7 @@ package:
 custom:
   bucketName: olist-datalake-unisenai-${self:provider.stage}
   glueScriptsBucket: olist-glue-scripts-${self:provider.stage}
+  athenaResultsBucket: olist-athena-results-${self:provider.stage}
   glueJobName: olist-etl-${self:provider.stage}
   redshiftWorkgroup: olist-redshift-workgroup
   redshiftDatabase: olistdb
@@ -107,6 +108,22 @@ resources:
               Status: Enabled
               Prefix: logs/
               ExpirationInDays: 7
+    
+    # S3 Bucket - Athena Query Results
+    AthenaResultsBucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: ${self:custom.athenaResultsBucket}
+        PublicAccessBlockConfiguration:
+          BlockPublicAcls: true
+          BlockPublicPolicy: true
+          IgnorePublicAcls: true
+          RestrictPublicBuckets: true
+        LifecycleConfiguration:
+          Rules:
+            - Id: DeleteOldQueryResults
+              Status: Enabled
+              ExpirationInDays: 30
 
   Outputs:
     BucketName:
@@ -120,6 +137,14 @@ resources:
     GlueScriptsBucketName:
       Value: ${self:custom.glueScriptsBucket}
       Description: Nome do S3 Bucket para scripts Glue (criado pelo plugin)
+    
+    AthenaResultsBucketName:
+      Value: !Ref AthenaResultsBucket
+      Description: Nome do S3 Bucket para resultados de queries do Athena
+    
+    AthenaResultsBucketArn:
+      Value: !GetAtt AthenaResultsBucket.Arn
+      Description: ARN do S3 Bucket do Athena
     
     GlueJobName:
       Value: ${self:custom.glueJobName}
