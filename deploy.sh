@@ -75,6 +75,10 @@ deactivate
 # ==============================================================================
 # CONCLUSÃO
 # ==============================================================================
+
+# Obter Account ID
+ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text 2>/dev/null || echo "<account-id>")
+
 echo ""
 echo -e "${GREEN}=============================================${NC}"
 echo -e "${GREEN}   Deploy concluído com sucesso!${NC}"
@@ -83,9 +87,9 @@ echo ""
 echo -e "Recursos criados:"
 echo -e "  ${BLUE}Serverless:${NC}"
 echo -e "    - Lambda: olist-analytics-pipeline-${STAGE}-ingest"
-echo -e "    - S3: olist-datalake-unisenai-${STAGE}"
-echo -e "    - S3: olist-glue-scripts-${STAGE}"
-echo -e "    - S3: olist-athena-results-${STAGE}"
+echo -e "    - S3: olist-datalake-${ACCOUNT_ID}-${STAGE}"
+echo -e "    - S3: olist-glue-scripts-${ACCOUNT_ID}-${STAGE}"
+echo -e "    - S3: olist-athena-results-${ACCOUNT_ID}-${STAGE}"
 echo -e "    - Glue Job: olist-etl-${STAGE}"
 echo ""
 echo -e "  ${BLUE}CDK:${NC}"

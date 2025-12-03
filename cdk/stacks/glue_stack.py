@@ -14,8 +14,8 @@ class GlueStack(Stack):
     def __init__(self, scope: Construct, construct_id: str, stage: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
-        # Nomes dos recursos baseados no stage
-        bucket_name = f"olist-datalake-unisenai-{stage}"
+        # Nomes dos recursos baseados no stage e account ID para unicidade
+        bucket_name = f"olist-datalake-{self.account}-{stage}"
         database_name = f"olist_datalake_{stage}"
         crawler_name = f"olist-processed-crawler-{stage}"
 

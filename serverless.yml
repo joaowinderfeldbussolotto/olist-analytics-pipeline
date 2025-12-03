@@ -26,9 +26,9 @@ package:
     - '!lambda/**/*.pyc'
 
 custom:
-  bucketName: olist-datalake-unisenai-${self:provider.stage}
-  glueScriptsBucket: olist-glue-scripts-${self:provider.stage}
-  athenaResultsBucket: olist-athena-results-${self:provider.stage}
+  bucketName: olist-datalake-${aws:accountId}-${self:provider.stage}
+  glueScriptsBucket: olist-glue-scripts-${aws:accountId}-${self:provider.stage}
+  athenaResultsBucket: olist-athena-results-${aws:accountId}-${self:provider.stage}
   glueJobName: olist-etl-${self:provider.stage}
   redshiftWorkgroup: olist-redshift-workgroup
   redshiftDatabase: olistdb
