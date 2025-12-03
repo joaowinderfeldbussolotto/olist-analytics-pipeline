@@ -1,0 +1,69 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Olist Analytics Pipeline - Glue Database e Crawler'
+
+Parameters:
+  Stage:
+    Type: String
+    Default: dev
+    Description: Environment stage (dev, prod)
+    AllowedValues:
+      - dev
+      - prod
+
+Resources:
+  # =====================================================
+  # GLUE DATABASE
+  # =====================================================
+  OlistGlueDatabase:
+    Type: AWS::Glue::Database
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseInput:
+        Name: !Sub 'olist_datalake_${Stage}'
+        Description: 'Database do Data Lake Olist - Camada Processed'
+        LocationUri: !Sub 's3://olist-datalake-${AWS::AccountId}-${Stage}/processed/'
+
+  # =====================================================
+  # GLUE CRAWLER
+  # =====================================================
+  OlistProcessedCrawler:
+    Type: AWS::Glue::Crawler
+    DependsOn: OlistGlueDatabase
+    Properties:
+      Name: !Sub 'olist-processed-crawler-${Stage}'
+      Role: !Sub 'arn:aws:iam::${AWS::AccountId}:role/LabRole'
+      DatabaseName: !Sub 'olist_datalake_${Stage}'
+      Description: 'Crawler para catalogar dados processados do Olist'
+      Targets:
+        S3Targets:
+          - Path: !Sub 's3://olist-datalake-${AWS::AccountId}-${Stage}/processed/'
+            Exclusions:
+              - '**/_temporary/**'
+              - '**/_spark_metadata/**'
+              - '**/.spark-staging/**'
+      SchemaChangePolicy:
+        UpdateBehavior: UPDATE_IN_DATABASE
+        DeleteBehavior: LOG
+      RecrawlPolicy:
+        RecrawlBehavior: CRAWL_EVERYTHING
+      TablePrefix: 'olist_'
+      Tags:
+        Project: Olist
+        Environment: !Ref Stage
+
+Outputs:
+  GlueDatabaseName:
+    Value: !Sub 'olist_datalake_${Stage}'
+    Description: Nome do Glue Database
+    Export:
+      Name: !Sub '${AWS::StackName}-DatabaseName'
+
+  GlueCrawlerName:
+    Value: !Sub 'olist-processed-crawler-${Stage}'
+    Description: Nome do Glue Crawler
+    Export:
+      Name: !Sub '${AWS::StackName}-CrawlerName'
+
+  CrawlerTargetPath:
+    Value: !Sub 's3://olist-datalake-${AWS::AccountId}-${Stage}/processed/'
+    Description: Path S3 do Crawler

@@ -5,8 +5,7 @@
 # Este script executa o deploy completo da infraestrutura:
 # 1. Instala dependências npm (Serverless Framework)
 # 2. Faz deploy do Serverless (Lambda, S3, Glue Job)
-# 3. Instala dependências Python do CDK
-# 4. Faz deploy do CDK (Glue Database e Crawler)
+# 3. Faz deploy do CloudFormation (Glue Database e Crawler)
 # ==============================================================================
 
 set -e  # Sair em caso de erro
@@ -21,50 +20,46 @@ NC='\033[0m' # No Color
 # Stage (pode ser passado como argumento ou usa 'dev' como padrão)
 STAGE=${1:-dev}
 
+# Obter Account ID
+ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text 2>/dev/null || echo "<account-id>")
+
 echo -e "${BLUE}=============================================${NC}"
 echo -e "${BLUE}   Olist Analytics Pipeline - Deploy${NC}"
 echo -e "${BLUE}   Stage: ${YELLOW}${STAGE}${NC}"
+echo -e "${BLUE}   Account: ${YELLOW}${ACCOUNT_ID}${NC}"
 echo -e "${BLUE}=============================================${NC}"
 echo ""
 
 # ==============================================================================
 # FASE 1: Serverless Framework
 # ==============================================================================
-echo -e "${GREEN}[1/4]${NC} Instalando dependências npm..."
+echo -e "${GREEN}[1/3]${NC} Instalando dependências npm..."
 npm install
 
 echo ""
-echo -e "${GREEN}[2/4]${NC} Fazendo deploy do Serverless Framework..."
+echo -e "${GREEN}[2/3]${NC} Fazendo deploy do Serverless Framework..."
 echo -e "${YELLOW}       (Lambda, S3 Buckets, Glue Job)${NC}"
 npx serverless deploy --stage $STAGE
 
 # ==============================================================================
-# FASE 2: AWS CDK
+# FASE 2: CloudFormation (Glue Resources)
 # ==============================================================================
 echo ""
-echo -e "${GREEN}[3/4]${NC} Fazendo deploy do CDK..."
+echo -e "${GREEN}[3/3]${NC} Fazendo deploy do CloudFormation..."
 echo -e "${YELLOW}       (Glue Database, Glue Crawler)${NC}"
 
-cd cdk
+STACK_NAME="olist-glue-resources-${STAGE}"
 
-# Bootstrap CDK (necessário na primeira execução)
-echo "       Verificando bootstrap do CDK..."
-cdk bootstrap --context stage=$STAGE 2>/dev/null || true
-
-# Deploy
-echo ""
-echo -e "${GREEN}[4/4]${NC} Deploy CDK..."
-cdk deploy --context stage=$STAGE --require-approval never
-
-cd ..
+aws cloudformation deploy \
+    --template-file cloudformation/glue-resources.yml \
+    --stack-name $STACK_NAME \
+    --parameter-overrides Stage=$STAGE \
+    --capabilities CAPABILITY_IAM \
+    --no-fail-on-empty-changeset
 
 # ==============================================================================
 # CONCLUSÃO
 # ==============================================================================
-
-# Obter Account ID
-ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text 2>/dev/null || echo "<account-id>")
-
 echo ""
 echo -e "${GREEN}=============================================${NC}"
 echo -e "${GREEN}   Deploy concluído com sucesso!${NC}"
@@ -78,7 +73,7 @@ echo -e "    - S3: olist-glue-scripts-${ACCOUNT_ID}-${STAGE}"
 echo -e "    - S3: olist-athena-results-${ACCOUNT_ID}-${STAGE}"
 echo -e "    - Glue Job: olist-etl-${STAGE}"
 echo ""
-echo -e "  ${BLUE}CDK:${NC}"
+echo -e "  ${BLUE}CloudFormation:${NC}"
 echo -e "    - Glue Database: olist_datalake_${STAGE}"
 echo -e "    - Glue Crawler: olist-processed-crawler-${STAGE}"
 echo ""
