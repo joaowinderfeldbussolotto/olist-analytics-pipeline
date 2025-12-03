@@ -9,8 +9,8 @@ import io
 s3 = boto3.client("s3", region_name="us-east-1")
 glue = boto3.client("glue", region_name="us-east-1")
 
-BUCKET_NAME = os.environ["BUCKET_NAME"]
-GLUE_JOB_NAME = os.environ["GLUE_JOB_NAME"]
+BUCKET_NAME = os.environ.get("BUCKET_NAME", "teste-olist-jvwb")
+GLUE_JOB_NAME = os.environ.get("GLUE_JOB_NAME", "teste-glue")
 
 EXPECTED_FILES = [
     "olist_customers_dataset.csv",
@@ -41,7 +41,7 @@ def write_metadata(bucket, execution_id, files_count):
 def start_glue_job(glue_job_name, execution_id, bucket):
     response = glue.start_job_run(
         JobName=glue_job_name,
-        Arguments={"--execution_id": execution_id, "--bucket_name": bucket},
+        Arguments={"--execution_id": execution_id, "--bucket_name": bucket, "--redshift_workgroup": "workgroup123", "--redshift_database": "database123"},
     )
     return response["JobRunId"]
 
@@ -89,18 +89,7 @@ def lambda_handler(event, context):
         execution_id = datetime.now().strftime("%Y%m%d_%H%M%S")
         write_metadata(BUCKET_NAME, execution_id, len(EXPECTED_FILES))
 
-
-        return {
-            "statusCode": 200,
-            "body": json.dumps(
-                {
-                    "message": "Pipeline started successfully",
-                    "execution_id": execution_id,
-                    "files_processed": len(EXPECTED_FILES),
-                }
-            ),
-        }
-
+        # return {}
         print(f"Iniciando Glue Job: {GLUE_JOB_NAME}")
         job_run_id = start_glue_job(GLUE_JOB_NAME, execution_id, BUCKET_NAME)
         print(f"Glue Job iniciado: {job_run_id}")

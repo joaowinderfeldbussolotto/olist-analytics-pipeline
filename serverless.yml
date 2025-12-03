@@ -32,6 +32,9 @@ provider:
             - logs:PutLogEvents
           Resource: '*'
 
+plugins:
+  - serverless-glue
+
 package:
   individually: false
   patterns:
@@ -42,8 +45,12 @@ package:
 
 custom:
   bucketName: olist-datalake-unisenai-${self:provider.stage}
+  glueScriptsBucket: olist-glue-scripts-${self:provider.stage}
   glueJobName: olist-etl-${self:provider.stage}
-
+  redshiftWorkgroup: olist-redshift-workgroup
+  redshiftDatabase: olistdb
+  glueRoleArn: !GetAtt OlistGlueRole.Arn
+  
 functions:
   ingest:
     handler: lambda/ingest/handler.lambda_handler
@@ -56,8 +63,47 @@ functions:
           rate: cron(0 2 * * ? *)
           enabled: true
 
+# =====================================================
+# CONFIGURAÇÃO GLUE PLUGIN
+# =====================================================
+Glue:
+  bucketDeploy: ${self:custom.glueScriptsBucket}
+  createBucket: true  # Plugin cria o bucket ANTES de fazer upload dos scripts
+  s3Prefix: scripts/
+  tempDirBucket: ${self:custom.glueScriptsBucket}
+  tempDirS3Prefix: temp/
+  
+  jobs:
+    - name: ${self:custom.glueJobName}
+      scriptPath: glue/olist_etl.py
+      type: spark
+      glueVersion: python3-5.0
+      role: ${self:custom.glueRoleArn}
+      WorkerType: G.1X
+      NumberOfWorkers: 2
+      Timeout: 120
+      MaxRetries: 1
+      MaxConcurrentRuns: 1
+      DefaultArguments:
+        --enable-metrics: 'true'
+        --enable-spark-ui: 'true'
+        --enable-glue-datacatalog: 'true'
+        --enable-continuous-cloudwatch-log: 'true'
+        --job-language: python
+        --extra-py-files: s3://${self:custom.glueScriptsBucket}/libs/
+        --additional-python-modules: boto3==1.41.5,botocore==1.41.5
+        customArguments:
+          bucket_name: ${self:custom.bucketName}
+          redshift_workgroup: ${self:custom.redshiftWorkgroup}
+          redshift_database: ${self:custom.redshiftDatabase}
+      Tags:
+        Project: Olist
+        Environment: ${self:provider.stage}
+
+
 resources:
   Resources:
+    # S3 Bucket - Data Lake
     DataLakeBucket:
       Type: AWS::S3::Bucket
       Properties:
@@ -75,6 +121,73 @@ resources:
               Status: Enabled
               Prefix: raw/_metadata/
               ExpirationInDays: 30
+            - Id: DeleteOldLogs
+              Status: Enabled
+              Prefix: logs/
+              ExpirationInDays: 7
+    
+    # IAM Role para Glue Job
+    OlistGlueRole:
+      Type: AWS::IAM::Role
+      Properties:
+        RoleName: OlistGlueRole-${self:provider.stage}
+        AssumeRolePolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service: glue.amazonaws.com
+              Action: sts:AssumeRole
+        ManagedPolicyArns:
+          - arn:aws:iam::aws:policy/service-role/AWSGlueServiceRole
+        Policies:
+          - PolicyName: OlistGluePolicy
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                # S3 Access - Data Lake
+                - Effect: Allow
+                  Action:
+                    - s3:GetObject
+                    - s3:PutObject
+                    - s3:DeleteObject
+                    - s3:ListBucket
+                  Resource:
+                    - arn:aws:s3:::${self:custom.bucketName}
+                    - arn:aws:s3:::${self:custom.bucketName}/*
+                
+                # S3 Access - Glue Scripts
+                - Effect: Allow
+                  Action:
+                    - s3:GetObject
+                    - s3:PutObject
+                    - s3:DeleteObject
+                    - s3:ListBucket
+                  Resource:
+                    - arn:aws:s3:::${self:custom.glueScriptsBucket}
+                    - arn:aws:s3:::${self:custom.glueScriptsBucket}/*
+                
+                # Bedrock Access (para análise de sentimento)
+                - Effect: Allow
+                  Action:
+                    - bedrock:InvokeModel
+                  Resource: '*'
+                
+                # Redshift Data API Access
+                - Effect: Allow
+                  Action:
+                    - redshift-data:ExecuteStatement
+                    - redshift-data:DescribeStatement
+                    - redshift-data:GetStatementResult
+                  Resource: '*'
+                
+                # CloudWatch Logs
+                - Effect: Allow
+                  Action:
+                    - logs:CreateLogGroup
+                    - logs:CreateLogStream
+                    - logs:PutLogEvents
+                  Resource: '*'
 
   Outputs:
     BucketName:
@@ -84,3 +197,15 @@ resources:
     BucketArn:
       Value: !GetAtt DataLakeBucket.Arn
       Description: ARN do S3 Bucket
+    
+    GlueScriptsBucketName:
+      Value: ${self:custom.glueScriptsBucket}
+      Description: Nome do S3 Bucket para scripts Glue (criado pelo plugin)
+    
+    GlueJobName:
+      Value: ${self:custom.glueJobName}
+      Description: Nome do Glue Job
+    
+    GlueRoleArn:
+      Value: !GetAtt OlistGlueRole.Arn
+      Description: ARN da IAM Role do Glue Job
