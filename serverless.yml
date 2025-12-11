@@ -170,6 +170,7 @@ stepFunctions:
   stateMachines:
     olistAnalyticsPipeline:
       name: olist-analytics-pipeline-${self:provider.stage}
+      role: arn:aws:iam::${aws:accountId}:role/LabRole
       definition:
         Comment: Orquestração Lambda -> Glue -> Crawler
         StartAt: Lambda Invoke
@@ -211,21 +212,6 @@ stepFunctions:
             Parameters:
               Name: olist-processed-crawler-${self:provider.stage}
             End: true
-      iamRoleStatements:
-        - Effect: Allow
-          Action:
-            - lambda:InvokeFunction
-            - lambda:InvokeAsync
-          Resource:
-            - arn:aws:lambda:${self:provider.region}:${aws:accountId}:function:${self:service}-${self:provider.stage}-ingest:* 
-        - Effect: Allow
-          Action:
-            - glue:StartJobRun
-          Resource: '*'
-        - Effect: Allow
-          Action:
-            - glue:StartCrawler
-          Resource: '*'
 
   Outputs:
     BucketName:
