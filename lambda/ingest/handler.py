@@ -7,10 +7,8 @@ import zipfile
 import io
 
 s3 = boto3.client("s3", region_name="us-east-1")
-glue = boto3.client("glue", region_name="us-east-1")
 
 BUCKET_NAME = os.environ.get("BUCKET_NAME", "teste-olist-jvwb")
-GLUE_JOB_NAME = os.environ.get("GLUE_JOB_NAME", "teste-glue")
 
 EXPECTED_FILES = [
     "olist_customers_dataset.csv",
@@ -37,13 +35,6 @@ def write_metadata(bucket, execution_id, files_count):
         ),
     )
 
-
-def start_glue_job(glue_job_name, execution_id, bucket):
-    response = glue.start_job_run(
-        JobName=glue_job_name,
-        Arguments={"--execution_id": execution_id, "--bucket_name": bucket, "--redshift_workgroup": "workgroup123", "--redshift_database": "database123"},
-    )
-    return response["JobRunId"]
 
 
 def download_dataset():
@@ -79,7 +70,7 @@ def process_and_upload_dataset(zip_data, bucket, expected_files):
 def lambda_handler(event, context):
     """
     1. Baixa o dataset do Kaggle e envia para S3
-    2. Dispara o Glue Job ETL
+    2. Retorna metadados para a Step Functions acionar o Glue
     """
     try:
         print(f"Iniciando pipeline Olist - Bucket: {BUCKET_NAME}")
@@ -89,18 +80,13 @@ def lambda_handler(event, context):
         execution_id = datetime.now().strftime("%Y%m%d_%H%M%S")
         write_metadata(BUCKET_NAME, execution_id, len(EXPECTED_FILES))
 
-        # return {}
-        print(f"Iniciando Glue Job: {GLUE_JOB_NAME}")
-        job_run_id = start_glue_job(GLUE_JOB_NAME, execution_id, BUCKET_NAME)
-        print(f"Glue Job iniciado: {job_run_id}")
-
         return {
             "statusCode": 200,
             "body": json.dumps(
                 {
                     "message": "Pipeline started successfully",
                     "execution_id": execution_id,
-                    "glue_job_run_id": job_run_id,
+                    "bucket_name": BUCKET_NAME,
                     "files_processed": len(EXPECTED_FILES),
                 }
             ),
