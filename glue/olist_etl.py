@@ -2,7 +2,6 @@ import sys
 import json
 import boto3
 import time
-import random
 from datetime import datetime
 from awsglue.transforms import *
 from awsglue.utils import getResolvedOptions
@@ -11,6 +10,7 @@ from awsglue.context import GlueContext
 from awsglue.job import Job
 from pyspark.sql.functions import *
 from pyspark.sql.types import *
+from transformers import pipeline
 
 # Print boto3 version
 print(f"boto3 version: {getattr(boto3, '__version__', 'unknown')}")
@@ -40,9 +40,14 @@ PROCESSED_PATH = f"s3://{BUCKET}/processed"
 REDSHIFT_WORKGROUP = args['redshift_workgroup']
 REDSHIFT_DATABASE = args['redshift_database']
 
-bedrock = boto3.client('bedrock-runtime', region_name='us-east-1')
 redshift_data = boto3.client('redshift-data', region_name='us-east-1')
 s3_client = boto3.client('s3')
+
+# Carregar modelo especializado de análise de sentimento
+print("Carregando modelo Hugging Face...")
+classifier = pipeline("text-classification",
+                      model="winderfeld/olist-sentiment-mistral-distilled-bert")
+print("✓ Modelo carregado com sucesso")
 
 print("="*70)
 print(f"OLIST PIPELINE COMPLETO - Execution ID: {EXECUTION_ID}")
@@ -178,8 +183,7 @@ print("\n[4/7] 🤖 Análise de sentimento...")
 
 reviews_with_text = reviews_df \
     .filter(col('review_comment_message').isNotNull()) \
-    .filter(length(trim(col('review_comment_message'))) > 20) \
-    .limit(200)
+    .filter(length(trim(col('review_comment_message'))) > 20)
 
 reviews_with_text_count = reviews_with_text.count()
 print(f"  ℹ️  Reviews com texto: {reviews_with_text_count}")
@@ -191,79 +195,35 @@ if reviews_with_text_count == 0:
         'order_id',
         'review_score',
         lit(None).cast(StringType()).alias('review_comment_message'),
-        lit(None).cast(StringType()).alias('ai_sentiment'),
-        lit(None).cast(DoubleType()).alias('ai_sentiment_score'),
-        lit(None).cast(StringType()).alias('ai_topics')
+        lit(None).cast(StringType()).alias('ai_sentiment')
     )
 else:
-    def analyze_sentiment_bedrock(text):
-        """Mock: Gera sentimento aleatório (Bedrock desabilitado temporariamente)"""
+    def analyze_sentiment_huggingface(text):
+        """Análise de sentimento usando modelo especializado Hugging Face"""
         if not text or len(text.strip()) < 20:
-            return json.dumps({'sentiment': 'neutral', 'score': 0.5, 'topics': []})
+            return 'neutro'
         
-        # Mock: Resultados aleatórios
-        sentiments = ['positive', 'negative', 'neutral']
-        topics_pool = ['entrega', 'qualidade', 'preço', 'atendimento', 'embalagem', 'produto', 'prazo']
-        
-        sentiment = random.choice(sentiments)
-        score = random.uniform(0.3, 0.95) if sentiment != 'neutral' else random.uniform(0.4, 0.6)
-        num_topics = random.randint(1, 3)
-        topics = random.sample(topics_pool, num_topics)
-        
-        # Usar formato float direto (evitar conflito com pyspark.round)
-        score_rounded = float(int(score * 100) / 100)
-        
-        return json.dumps({'sentiment': sentiment, 'score': score_rounded, 'topics': topics})
-        
-        # TODO: Habilitar Bedrock quando disponível
-        # prompt = f"""Analise este review em português:
-        # 
-        # "{text[:500]}"
-        # 
-        # Responda APENAS com JSON (sem markdown):
-        # {{"sentiment": "positive|negative|neutral", "score": 0.0, "topics": ["tópico1"]}}"""
-        # 
-        # try:
-        #     response = bedrock.invoke_model(
-        #         modelId='anthropic.claude-3-sonnet-20240229-v1:0',
-        #         body=json.dumps({
-        #             'anthropic_version': 'bedrock-2023-05-31',
-        #             'max_tokens': 400,
-        #             'messages': [{'role': 'user', 'content': prompt}],
-        #             'temperature': 0.1
-        #         })
-        #     )
-        #     
-        #     result = json.loads(response['body'].read())
-        #     content = result['content'][0]['text']
-        #     
-        #     import re
-        #     json_match = re.search(r'\{[^{}]*\}', content, re.DOTALL)
-        #     return json_match.group(0) if json_match else content
-        #     
-        # except Exception as e:
-        #     print(f"  ⚠️ Bedrock error: {str(e)}")
-        #     return json.dumps({'sentiment': 'error', 'score': 0.0, 'topics': []})
+        try:
+            # Truncar texto para limite do modelo (512 tokens)
+            text_truncated = text[:500]
+            result = classifier(text_truncated)
+            # Output: [{'label': 'positivo', 'score': 0.932085037231...}]
+            sentiment = result[0]['label']
+            return sentiment
+        except Exception as e:
+            print(f"  ⚠️ Erro na classificação: {str(e)}")
+            return 'error'
     
-    sentiment_udf = udf(analyze_sentiment_bedrock, StringType())
+    sentiment_udf = udf(analyze_sentiment_huggingface, StringType())
     
     reviews_enriched = reviews_with_text \
-        .withColumn('sentiment_raw', sentiment_udf(col('review_comment_message'))) \
-        .withColumn('sentiment_parsed', 
-                    from_json('sentiment_raw', 
-                             StructType([
-                                 StructField('sentiment', StringType()),
-                                 StructField('score', DoubleType()),
-                                 StructField('topics', ArrayType(StringType()))
-                             ]))) \
+        .withColumn('ai_sentiment', sentiment_udf(col('review_comment_message'))) \
         .select(
             'review_id',
             'order_id',
             'review_score',
             'review_comment_message',
-            col('sentiment_parsed.sentiment').alias('ai_sentiment'),
-            col('sentiment_parsed.score').alias('ai_sentiment_score'),
-            array_join(col('sentiment_parsed.topics'), ', ').alias('ai_topics')
+            'ai_sentiment'
         )
     
     reviews_without_text = reviews_df \
@@ -274,9 +234,7 @@ else:
             'order_id',
             'review_score',
             lit(None).cast(StringType()).alias('review_comment_message'),
-            lit(None).cast(StringType()).alias('ai_sentiment'),
-            lit(None).cast(DoubleType()).alias('ai_sentiment_score'),
-            lit(None).cast(StringType()).alias('ai_topics')
+            lit(None).cast(StringType()).alias('ai_sentiment')
         )
     
     reviews_final = reviews_enriched.union(reviews_without_text)
@@ -375,70 +333,6 @@ failed_loads = [t for t, c in s3_counts.items() if c == 0]
 
 print(f"\n  📊 Resultado S3: {successful_loads}/{len(s3_tables)} tabelas salvas com sucesso")
 
-# TODO: Habilitar quando Redshift estiver configurado
-# def execute_redshift_sql(sql, description):
-#     """Executa SQL no Redshift via Data API"""
-#     print(f"\n  🔄 {description}...")
-#     
-#     response = redshift_data.execute_statement(
-#         WorkgroupName=REDSHIFT_WORKGROUP,
-#         Database=REDSHIFT_DATABASE,
-#         Sql=sql
-#     )
-#     
-#     statement_id = response['Id']
-#     
-#     # Aguardar conclusão
-#     max_attempts = 60
-#     for attempt in range(max_attempts):
-#         status_response = redshift_data.describe_statement(Id=statement_id)
-#         status = status_response['Status']
-#         
-#         if status == 'FINISHED':
-#             duration = status_response.get('Duration', 0) / 1_000_000_000
-#             print(f"    ✅ Concluído em {duration:.2f}s")
-#             return True
-#         
-#         elif status == 'FAILED':
-#             error = status_response.get('Error', 'Unknown error')
-#             print(f"    ❌ Falhou: {error}")
-#             return False
-#         
-#         elif status in ['SUBMITTED', 'PICKED', 'STARTED']:
-#             if attempt % 6 == 0:
-#                 print(f"    ⏳ Em progresso... ({attempt * 10}s)")
-#             time.sleep(10)
-#     
-#     print(f"    ⏰ Timeout")
-#     return False
-# 
-# # Tabelas para carregar no Redshift
-# tables_to_load = [
-#     ('olist.fact_orders', f"s3://{BUCKET}/processed/fact_orders/"),
-#     ('olist.fact_reviews', f"s3://{BUCKET}/processed/fact_reviews/"),
-#     ('olist.dim_customers', f"s3://{BUCKET}/processed/dim_customers/"),
-#     ('olist.dim_products', f"s3://{BUCKET}/processed/dim_products/"),
-#     ('olist.dim_sellers', f"s3://{BUCKET}/processed/dim_sellers/")
-# ]
-# 
-# for table_name, s3_path in tables_to_load:
-#     sql = f"""
-#     BEGIN TRANSACTION;
-#     TRUNCATE TABLE {table_name};
-#     COPY {table_name}
-#     FROM '{s3_path}'
-#     IAM_ROLE default
-#     FORMAT AS PARQUET
-#     ACCEPTINVCHARS;
-#     COMMIT;
-#     """
-#     
-#     success = execute_redshift_sql(sql, f"Carregando {table_name}")
-#     
-#     if success:
-#         successful_loads += 1
-#     else:
-#         failed_loads.append(table_name)
 
 # =====================================================
 # FASE 7: VALIDAÇÃO E MÉTRICAS
@@ -450,38 +344,6 @@ print("\n  📊 Contagens finais no S3:")
 for table_name, count in s3_counts.items():
     print(f"    {table_name}: {count:,}")
 
-# TODO: Habilitar validação Redshift quando disponível
-# validation_sql = """
-# SELECT 
-#     'fact_orders' as table_name, COUNT(*) as count FROM olist.fact_orders
-# UNION ALL
-# SELECT 'fact_reviews', COUNT(*) FROM olist.fact_reviews
-# UNION ALL
-# SELECT 'dim_customers', COUNT(*) FROM olist.dim_customers
-# UNION ALL
-# SELECT 'dim_products', COUNT(*) FROM olist.dim_products
-# UNION ALL
-# SELECT 'dim_sellers', COUNT(*) FROM olist.dim_sellers;
-# """
-# 
-# response = redshift_data.execute_statement(
-#     WorkgroupName=REDSHIFT_WORKGROUP,
-#     Database=REDSHIFT_DATABASE,
-#     Sql=validation_sql
-# )
-# 
-# time.sleep(5)
-# 
-# try:
-#     result = redshift_data.get_statement_result(Id=response['Id'])
-#     
-#     print("\n  Contagens Redshift:")
-#     for record in result['Records']:
-#         table_name = record[0]['stringValue']
-#         count = record[1]['longValue']
-#         print(f"    {table_name}: {count:,}")
-# except Exception as e:
-#     print(f"  ⚠️ Erro ao validar: {str(e)}")
 
 # Estatísticas finais
 stats = {

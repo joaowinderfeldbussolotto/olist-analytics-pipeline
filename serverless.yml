@@ -75,7 +75,7 @@ Glue:
         --enable-continuous-cloudwatch-log: 'true'
         --job-language: python
         --extra-py-files: s3://${self:custom.glueScriptsBucket}/libs/
-        --additional-python-modules: boto3==1.41.5,botocore==1.41.5
+        --additional-python-modules: boto3==1.41.5,botocore==1.41.5,transformers==4.44.0,torch==2.1.0,sentencepiece==0.2.0,protobuf==4.25.0
         customArguments:
           bucket_name: ${self:custom.bucketName}
           redshift_workgroup: ${self:custom.redshiftWorkgroup}
