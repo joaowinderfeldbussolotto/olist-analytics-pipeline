@@ -53,7 +53,13 @@ echo -e "${GREEN}✓${NC} requirements.txt enviado para s3://${GLUE_BUCKET}/requ
 # Atualizar job com argumentos de Python modules
 echo -e "${GREEN}✓${NC} Atualizando Glue job com parâmetros de dependências..."
 aws glue update-job --job-name "${GLUE_JOB}" --job-update \
-  "Command={Name=glueetl,ScriptLocation=s3://${GLUE_BUCKET}/scripts/olist_etl.py,PythonVersion=3},\
+  "Role=arn:aws:iam::${ACCOUNT_ID}:role/LabRole,\
+Command={Name=glueetl,ScriptLocation=s3://${GLUE_BUCKET}/scripts/olist_etl.py,PythonVersion=3},\
+GlueVersion=5.0,\
+WorkerType=G.1X,\
+NumberOfWorkers=2,\
+Timeout=120,\
+MaxRetries=1,\
 DefaultArguments={\
 --enable-metrics=true,\
 --enable-spark-ui=true,\
