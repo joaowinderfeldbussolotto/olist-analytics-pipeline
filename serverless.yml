@@ -74,8 +74,6 @@ Glue:
         --enable-glue-datacatalog: 'true'
         --enable-continuous-cloudwatch-log: 'true'
         --job-language: 'python'
-        --python-modules-installer-option: '-r'
-        --additional-python-modules: 's3://${self:custom.glueScriptsBucket}/requirements.txt'
         customArguments:
           bucket_name: ${self:custom.bucketName}
           redshift_workgroup: ${self:custom.redshiftWorkgroup}

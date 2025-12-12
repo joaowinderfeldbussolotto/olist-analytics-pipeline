@@ -42,10 +42,31 @@ echo -e "${YELLOW}       (Lambda, S3, Glue Job, Database, Crawler)${NC}"
 npx serverless deploy --stage $STAGE
 
 echo ""
-echo -e "${GREEN}[3/3]${NC} Enviando requirements.txt para S3..."
+echo -e "${GREEN}[3/3]${NC} Configurando dependências Python do Glue..."
 GLUE_BUCKET="olist-glue-scripts-${ACCOUNT_ID}-${STAGE}"
+GLUE_JOB="olist-etl-${STAGE}"
+
+# Upload do requirements.txt
 aws s3 cp glue/requirements.txt "s3://${GLUE_BUCKET}/requirements.txt"
 echo -e "${GREEN}✓${NC} requirements.txt enviado para s3://${GLUE_BUCKET}/requirements.txt"
+
+# Atualizar job com argumentos de Python modules
+echo -e "${GREEN}✓${NC} Atualizando Glue job com parâmetros de dependências..."
+aws glue update-job --job-name "${GLUE_JOB}" --job-update \
+  "Command={Name=glueetl,ScriptLocation=s3://${GLUE_BUCKET}/scripts/olist_etl.py,PythonVersion=3},\
+DefaultArguments={\
+--enable-metrics=true,\
+--enable-spark-ui=true,\
+--enable-glue-datacatalog=true,\
+--enable-continuous-cloudwatch-log=true,\
+--job-language=python,\
+--python-modules-installer-option=-r,\
+--additional-python-modules=s3://${GLUE_BUCKET}/requirements.txt,\
+--bucket_name=olist-datalake-${ACCOUNT_ID}-${STAGE},\
+--redshift_workgroup=olist-redshift-workgroup,\
+--redshift_database=olistdb}"
+
+echo -e "${GREEN}✓${NC} Dependências Python configuradas com sucesso!"
 
 # ==============================================================================
 # CONCLUSÃO
