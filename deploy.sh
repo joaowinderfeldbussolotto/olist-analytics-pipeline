@@ -33,13 +33,19 @@ echo ""
 # ==============================================================================
 # DEPLOY
 # ==============================================================================
-echo -e "${GREEN}[1/2]${NC} Instalando dependências npm..."
+echo -e "${GREEN}[1/3]${NC} Instalando dependências npm..."
 npm install
 
 echo ""
-echo -e "${GREEN}[2/2]${NC} Fazendo deploy do Serverless Framework..."
+echo -e "${GREEN}[2/3]${NC} Fazendo deploy do Serverless Framework..."
 echo -e "${YELLOW}       (Lambda, S3, Glue Job, Database, Crawler)${NC}"
 npx serverless deploy --stage $STAGE
+
+echo ""
+echo -e "${GREEN}[3/3]${NC} Enviando requirements.txt para S3..."
+GLUE_BUCKET="olist-glue-scripts-${ACCOUNT_ID}-${STAGE}"
+aws s3 cp glue/requirements.txt "s3://${GLUE_BUCKET}/requirements.txt"
+echo -e "${GREEN}✓${NC} requirements.txt enviado para s3://${GLUE_BUCKET}/requirements.txt"
 
 # ==============================================================================
 # CONCLUSÃO
