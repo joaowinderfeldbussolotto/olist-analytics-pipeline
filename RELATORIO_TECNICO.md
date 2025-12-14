@@ -110,7 +110,7 @@ O dataset é composto por **8 tabelas relacionais**:
 | Dimensão | Análise |
 |----------|---------|
 | **Volume** | ~3 milhões de registros totais; geolocalização com 1M+ entradas |
-| **Velocidade** | Dados históricos (batch processing); potencial para streaming em produção |
+| **Velocidade** | Dados históricos (batch processing) |
 | **Variedade** | Dados estruturados (CSV), texto não estruturado (reviews), dados geoespaciais |
 | **Veracidade** | Alta - dados reais de transações; alguns missing values em reviews |
 | **Valor** | Alto potencial para insights de negócio e otimização de processos |
@@ -119,124 +119,7 @@ O dataset é composto por **8 tabelas relacionais**:
 
 ## 4. EXPLORAÇÃO E ANÁLISE DESCRITIVA
 
-### 4.1 Variáveis Relevantes
-
-#### Tabela: Orders (Pedidos)
-| Variável | Tipo | Descrição | Tratamento |
-|----------|------|-----------|------------|
-| `order_id` | String (PK) | Identificador único do pedido | Chave primária |
-| `customer_id` | String (FK) | Identificador do cliente | Chave estrangeira |
-| `order_status` | Categorical | Status do pedido (delivered, shipped, etc.) | Filtro: remover nulos |
-| `order_purchase_timestamp` | Timestamp | Data/hora da compra | Conversão para datetime |
-| `order_delivered_customer_date` | Timestamp | Data de entrega real | Conversão para datetime |
-| `order_estimated_delivery_date` | Timestamp | Data de entrega estimada | Conversão para datetime |
-
-#### Variáveis Derivadas (Feature Engineering)
-| Variável | Fórmula | Propósito |
-|----------|---------|-----------|
-| `days_to_deliver` | delivered_date - purchase_date | Análise de eficiência logística |
-| `delivery_delay_days` | delivered_date - estimated_date | Identificar atrasos |
-| `is_delayed` | delay > 0 | Flag binária para atrasos |
-| `total_order_value` | sum(items.price) + sum(items.freight) | Valor total do pedido |
-
-#### Tabela: Reviews (Avaliações)
-| Variável | Tipo | Descrição | Tratamento |
-|----------|------|-----------|------------|
-| `review_score` | Numeric (1-5) | Nota do cliente | Análise de tendência central |
-| `review_comment_message` | Text | Comentário textual | Limpeza de nulos e textos curtos |
-| `ai_sentiment` | Categorical | Sentimento (positivo/negativo/neutro) | Gerado por modelo de IA |
-
-### 4.2 Análise Descritiva - Estatísticas
-
-#### Pedidos (Orders)
-```
-Total de pedidos: ~99.441
-Período: 2016-09-04 a 2018-08-29
-
-Distribuição de Status:
-- delivered:     96.478 (97.0%)
-- shipped:          108 (0.1%)
-- canceled:       1.084 (1.1%)
-- processing:       301 (0.3%)
-- others:         1.470 (1.5%)
-```
-
-#### Tempo de Entrega (days_to_deliver)
-| Métrica | Valor |
-|---------|-------|
-| **Média** | 12.5 dias |
-| **Mediana** | 10.0 dias |
-| **Moda** | 7 dias |
-| **Desvio Padrão** | 10.3 dias |
-| **Variância** | 106.09 |
-| **Mínimo** | 0 dias |
-| **Máximo** | 209 dias |
-| **Q1 (25%)** | 6 dias |
-| **Q3 (75%)** | 15 dias |
-
-**Interpretação:** Distribuição assimétrica positiva (right-skewed), indicando que a maioria das entregas ocorre entre 6-15 dias, mas existem outliers com atrasos significativos.
-
-#### Atrasos na Entrega (delivery_delay_days)
-| Métrica | Valor |
-|---------|-------|
-| **Média de Atraso** | -11.1 dias (antecipação média) |
-| **% Pedidos Atrasados** | 6.9% |
-| **Maior Atraso** | +189 dias |
-| **Maior Antecipação** | -140 dias |
-
-#### Avaliações de Clientes (Review Scores)
-| Nota | Quantidade | Percentual |
-|------|------------|------------|
-| 5 ⭐⭐⭐⭐⭐ | 57.420 | 57.8% |
-| 4 ⭐⭐⭐⭐ | 19.142 | 19.3% |
-| 3 ⭐⭐⭐ | 8.287 | 8.3% |
-| 2 ⭐⭐ | 3.149 | 3.2% |
-| 1 ⭐ | 11.444 | 11.5% |
-
-**Média:** 4.09 / 5.0  
-**Mediana:** 5.0  
-**Moda:** 5.0  
-**Desvio Padrão:** 1.31
-
-**Interpretação:** Distribuição bimodal (picos em 1 e 5 estrelas), indicando polarização nas experiências dos clientes.
-
-#### Valores de Pedidos (total_order_value)
-| Métrica | Valor (R$) |
-|---------|------------|
-| **Média** | 154.10 |
-| **Mediana** | 108.70 |
-| **Desvio Padrão** | 216.50 |
-| **Mínimo** | 9.90 |
-| **Máximo** | 13.664.08 |
-
-### 4.3 Análise Geográfica
-
-#### Top 5 Estados por Volume de Pedidos
-| Estado | Pedidos | % do Total |
-|--------|---------|------------|
-| SP (São Paulo) | 41.746 | 42.0% |
-| RJ (Rio de Janeiro) | 12.852 | 12.9% |
-| MG (Minas Gerais) | 11.635 | 11.7% |
-| RS (Rio Grande do Sul) | 5.466 | 5.5% |
-| PR (Paraná) | 5.045 | 5.1% |
-
-**Insight:** Forte concentração na região Sudeste (66.6%), indicando oportunidade de expansão em outras regiões.
-
-### 4.4 Análise de Correlação
-
-#### Matriz de Correlação - Variáveis Numéricas
-```
-                     days_to_deliver  review_score  total_value  is_delayed
-days_to_deliver             1.000        -0.282      0.034        0.543
-review_score               -0.282         1.000     -0.019       -0.341
-total_value                 0.034        -0.019      1.000        0.012
-is_delayed                  0.543        -0.341      0.012        1.000
-```
-
-**Insights Estatísticos:**
-1. **Correlação negativa moderada** (-0.282) entre tempo de entrega e satisfação
-2. **Correlação positiva forte** (0.543) entre tempo de entrega e probabilidade de atraso
-3. **Correlação negativa moderada** (-0.341) entre atraso e nota da avaliação
+_Esta seção será preenchida com a análise exploratória dos dados após a execução do pipeline._
 
 ---
 
@@ -248,69 +131,44 @@ is_delayed                  0.543        -0.341      0.012        1.000
 | Problema | Técnica Aplicada | Justificativa |
 |----------|------------------|---------------|
 | **Valores Nulos em Timestamps** | Remoção de registros | Dados críticos para análise temporal |
-| **Duplicatas em Orders** | `dropDuplicates(['order_id'])` | Garantir unicidade de pedidos |
+| **Duplicatas em Orders** | Remoção de duplicatas por order_id | Garantir unicidade de pedidos |
 | **Reviews sem Texto** | Separação em dataset distinto | Manter integridade para análise de sentimento |
 | **Outliers em Valores** | Manutenção com flag | Podem representar casos reais (produtos caros) |
 
 #### Transformações de Tipo
-```python
-# Conversão de Timestamps
-.withColumn('order_purchase_timestamp', to_timestamp('order_purchase_timestamp'))
-.withColumn('order_delivered_customer_date', to_timestamp('order_delivered_customer_date'))
-
-# Casting de valores nulos para zeros
-coalesce('total_items', lit(0)).alias('total_items')
-```
+- Conversão de timestamps para formato datetime
+- Conversão de valores nulos para zeros quando apropriado
 
 ### 5.2 Feature Engineering - Novas Variáveis
 
 #### 1. Métricas Temporais
-```python
-# Tempo de entrega em dias
-.withColumn('days_to_deliver', 
-    datediff('order_delivered_customer_date', 'order_purchase_timestamp'))
-
-# Atraso em relação à data estimada
-.withColumn('delivery_delay_days',
-    datediff('order_delivered_customer_date', 'order_estimated_delivery_date'))
-
-# Flag de atraso
-.withColumn('is_delayed', 
-    when(col('delivery_delay_days') > 0, lit(True)).otherwise(lit(False)))
-```
+Foram criadas variáveis derivadas para análise temporal:
+- **days_to_deliver**: Diferença em dias entre a data de compra e a data de entrega
+- **delivery_delay_days**: Diferença entre a data de entrega real e a estimada
+- **is_delayed**: Flag binária indicando se houve atraso na entrega
 
 #### 2. Agregações de Pagamentos
-```python
-payments_agg = payments_df.groupBy('order_id').agg(
-    sum('payment_value').alias('total_payment'),
-    count('*').alias('payment_count'),
-    max('payment_installments').alias('max_installments')
-)
-```
+Agregação dos dados de pagamento por pedido:
+- **total_payment**: Soma total dos valores pagos por pedido
+- **payment_count**: Quantidade de transações de pagamento
+- **max_installments**: Número máximo de parcelas utilizadas
 
 #### 3. Agregações de Itens
-```python
-items_agg = order_items_df.groupBy('order_id').agg(
-    count('*').alias('total_items'),
-    sum('price').alias('total_price'),
-    sum('freight_value').alias('total_freight')
-).withColumn('total_order_value', col('total_price') + col('total_freight'))
-```
+Agregação dos itens por pedido:
+- **total_items**: Quantidade de itens no pedido
+- **total_price**: Soma dos preços dos produtos
+- **total_freight**: Soma dos valores de frete
+- **total_order_value**: Valor total do pedido (preço + frete)
 
 #### 4. Geolocalização Média
-```python
-geo_avg = geo_df.groupBy('geolocation_zip_code_prefix').agg(
-    avg('geolocation_lat').alias('latitude'),
-    avg('geolocation_lng').alias('longitude')
-)
-```
+Cálculo de coordenadas médias por CEP:
+- **latitude**: Latitude média por CEP
+- **longitude**: Longitude média por CEP
 
 #### 5. Particionamento Temporal
-```python
-# Para otimização de consultas
-.withColumn('year', year('order_purchase_timestamp'))
-.withColumn('month', month('order_purchase_timestamp'))
-```
+Adição de colunas de partição para otimização de consultas:
+- **year**: Ano da compra
+- **month**: Mês da compra
 
 ### 5.3 Análise de Sentimento com IA
 
@@ -326,43 +184,7 @@ geo_avg = geo_df.groupBy('geolocation_zip_code_prefix').agg(
 - `neutro`: Comentário objetivo/neutro
 
 #### Implementação
-```python
-from transformers import pipeline
-
-# Carregamento do modelo
-classifier = pipeline("text-classification",
-                     model="winderfeld/olist-sentiment-mistral-distilled-bert")
-
-# UDF para aplicar em DataFrame Spark
-def analyze_sentiment_huggingface(text):
-    if not text or len(text.strip()) < 20:
-        return 'neutro'
-    
-    text_truncated = text[:500]  # Limite de tokens
-    result = classifier(text_truncated)
-    sentiment = result[0]['label']
-    return sentiment
-
-sentiment_udf = udf(analyze_sentiment_huggingface, StringType())
-
-# Aplicação no DataFrame
-reviews_enriched = reviews_df.withColumn(
-    'ai_sentiment', 
-    sentiment_udf(col('review_comment_message'))
-)
-```
-
-#### Métricas do Modelo
-| Métrica | Valor |
-|---------|-------|
-| **Acurácia** | 87.3% |
-| **Reviews Processadas** | ~41.000 |
-| **Tempo Médio por Review** | 0.15s |
-| **Concordância com Review Score** | 82.4% |
-
-**Validação:**
-- Reviews com nota 5 → 89% classificadas como "positivo"
-- Reviews com nota 1-2 → 85% classificadas como "negativo"
+O modelo de análise de sentimento foi aplicado aos comentários textuais das avaliações através de uma User Defined Function (UDF) no Spark. Reviews com menos de 20 caracteres foram classificadas automaticamente como neutras.
 
 ### 5.4 Modelagem Dimensional - Star Schema
 
@@ -417,7 +239,7 @@ reviews_enriched = reviews_df.withColumn(
 
 ┌──────────────┐     ┌──────────────┐     ┌──────────────┐
 │   KAGGLE     │     │   LAMBDA     │     │     S3       │
-│   API (1)    │────▶│  FUNCTION    │────▶│  RAW LAYER   │
+│   API        │────▶│  FUNCTION    │────▶│  RAW LAYER   │
 │              │     │   (Ingest)   │     │   (Bronze)   │
 └──────────────┘     └──────────────┘     └──────┬───────┘
                                                   │
@@ -471,26 +293,6 @@ reviews_enriched = reviews_df.withColumn(
 3. Upload para S3 (camada Raw/Bronze)
 4. Geração de metadados de execução
 
-**Código Simplificado:**
-```python
-def lambda_handler(event, context):
-    # 1. Download do Kaggle
-    zip_data = download_dataset()
-    
-    # 2. Upload para S3
-    process_and_upload_dataset(zip_data, BUCKET_NAME, EXPECTED_FILES)
-    
-    # 3. Metadados
-    execution_id = datetime.now().strftime("%Y%m%d_%H%M%S")
-    write_metadata(BUCKET_NAME, execution_id, len(EXPECTED_FILES))
-    
-    return {
-        "statusCode": 200,
-        "execution_id": execution_id,
-        "files_processed": 8
-    }
-```
-
 **Agendamento:**  
 - Cron Expression: `cron(0 2 * * ? *)` (diariamente às 02:00 UTC)
 - Ou trigger manual via Step Functions
@@ -505,21 +307,15 @@ def lambda_handler(event, context):
 **Max Retries:** 1  
 
 **Dependências Python:**
-```txt
-transformers==4.44.0
-torch==2.1.0
-sentencepiece==0.2.0
-accelerate==0.33.0
-```
+- transformers==4.44.0
+- torch==2.1.0
+- sentencepiece==0.2.0
+- accelerate==0.33.0
 
 **Etapas do ETL (7 fases):**
 
 ##### Fase 1: Leitura de Dados Raw
-```python
-orders_df = spark.read.option("header", "true") \
-    .option("inferSchema", "true") \
-    .csv(f"s3://{BUCKET}/raw/olist_orders_dataset.csv")
-```
+Leitura dos 8 arquivos CSV da camada Bronze com inferência automática de schema.
 
 ##### Fase 2: Transformações e Limpeza
 - Remoção de duplicatas
@@ -543,12 +339,7 @@ orders_df = spark.read.option("header", "true") \
 - dim_sellers
 
 ##### Fase 6: Escrita em Parquet
-```python
-fact_orders.write \
-    .mode('overwrite') \
-    .partitionBy('year', 'month') \
-    .parquet(f"s3://{BUCKET}/processed/fact_orders/")
-```
+Gravação das tabelas processadas em formato Parquet com particionamento temporal (year, month).
 
 ##### Fase 7: Validação e Métricas
 - Contagem de registros por tabela
@@ -559,7 +350,7 @@ fact_orders.write \
 - Formato Parquet (compressão ~70% vs CSV)
 - Particionamento temporal (queries 10x mais rápidas)
 - Pushdown predicates no Athena
-- Spark shuffling otimizado (coalesce)
+- Spark shuffling otimizado
 
 #### 3. ARMAZENAMENTO - Amazon S3
 **Buckets Criados:**
@@ -581,17 +372,11 @@ fact_orders.write \
 **Target:** `s3://bucket/processed/`  
 
 **Configuração:**
-```yaml
-SchemaChangePolicy:
-  UpdateBehavior: UPDATE_IN_DATABASE
-  DeleteBehavior: LOG
-RecrawlPolicy:
-  RecrawlBehavior: CRAWL_EVERYTHING
-TablePrefix: 'olist_'
-Exclusions:
-  - '**/_temporary/**'
-  - '**/_spark_metadata/**'
-```
+- UpdateBehavior: UPDATE_IN_DATABASE
+- DeleteBehavior: LOG
+- RecrawlBehavior: CRAWL_EVERYTHING
+- TablePrefix: 'olist_'
+- Exclusões: arquivos temporários e metadados Spark
 
 **Tabelas Catalogadas:**
 - `olist_fact_orders`
@@ -605,93 +390,32 @@ Exclusions:
 **Database:** `olist_datalake_dev`  
 **Query Engine:** Presto (Trino)  
 
-**Exemplos de Queries:**
-
-```sql
--- Top 10 cidades com mais pedidos
-SELECT customer_city, COUNT(*) as total_orders
-FROM olist_fact_orders
-WHERE year = 2018
-GROUP BY customer_city
-ORDER BY total_orders DESC
-LIMIT 10;
-
--- Correlação entre atraso e avaliação
-SELECT 
-    o.is_delayed,
-    AVG(r.review_score) as avg_score,
-    COUNT(*) as total
-FROM olist_fact_orders o
-JOIN olist_fact_reviews r ON o.order_id = r.order_id
-GROUP BY o.is_delayed;
-
--- Distribuição de sentimento por nota
-SELECT 
-    review_score,
-    ai_sentiment,
-    COUNT(*) as count
-FROM olist_fact_reviews
-WHERE ai_sentiment IS NOT NULL
-GROUP BY review_score, ai_sentiment
-ORDER BY review_score DESC, count DESC;
-```
+Exemplos de análises possíveis:
+- Top 10 cidades com mais pedidos
+- Correlação entre atraso e avaliação
+- Distribuição de sentimento por nota
 
 #### 6. ORQUESTRAÇÃO - AWS Step Functions
 **Nome:** `olist-analytics-pipeline-dev`  
 **Tipo:** Standard Workflow  
 
-**Diagrama de Estados:**
-```json
-{
-  "Comment": "Orquestração Lambda -> Glue -> Crawler",
-  "StartAt": "Lambda Invoke",
-  "States": {
-    "Lambda Invoke": {
-      "Type": "Task",
-      "Resource": "arn:aws:states:::lambda:invoke",
-      "Next": "Glue StartJobRun"
-    },
-    "Glue StartJobRun": {
-      "Type": "Task",
-      "Resource": "arn:aws:states:::glue:startJobRun.sync",
-      "Next": "StartCrawler"
-    },
-    "StartCrawler": {
-      "Type": "Task",
-      "Resource": "arn:aws:states:::aws-sdk:glue:startCrawler",
-      "End": true
-    }
-  }
-}
-```
+**Estados:**
+1. Lambda Invoke (ingestão)
+2. Glue StartJobRun (processamento)
+3. StartCrawler (catalogação)
 
 **Tratamento de Erros:**
 - Retry automático com backoff exponencial
 - MaxAttempts: 3 por etapa
-- Notificações via CloudWatch (opcional: SNS)
+- Notificações via CloudWatch
 
-#### 7. INTELIGÊNCIA ARTIFICIAL - Hugging Face (Modelo Customizado)
+#### 7. INTELIGÊNCIA ARTIFICIAL - Hugging Face
 
 **Modelo:** `winderfeld/olist-sentiment-mistral-distilled-bert`  
 **Arquitetura:** DistilBERT (6 layers, 66M parameters)  
-**Fine-tuning:** Dataset Olist com 41.000 reviews rotuladas  
+**Fine-tuning:** Dataset Olist com reviews rotuladas
 
-**Integração com Glue:**
-```python
-from transformers import pipeline
-
-classifier = pipeline("text-classification",
-                     model="winderfeld/olist-sentiment-mistral-distilled-bert")
-
-def analyze_sentiment(text):
-    result = classifier(text[:500])
-    return result[0]['label']  # positivo/negativo/neutro
-```
-
-**Performance:**
-- Inferência: ~0.15s por review
-- Batch processing: 100 reviews/minuto
-- Uso de GPU: Opcional (G.1X tem CPU-only; G.2X tem GPU)
+O modelo é carregado no início do job Glue e aplicado via UDF (User Defined Function) aos comentários textuais das avaliações.
 
 ### 6.4 Infraestrutura como Código (IaC)
 
@@ -701,11 +425,6 @@ def analyze_sentiment(text):
 - `serverless-step-functions`: Orquestração de workflows
 
 **Arquivo de Configuração:** `serverless.yml`
-
-**Comando de Deploy:**
-```bash
-./deploy.sh dev
-```
 
 **Recursos Criados Automaticamente:**
 - Lambda function + IAM roles
@@ -743,76 +462,13 @@ def analyze_sentiment(text):
 **Alertas Configurados:**
 - Glue job failure
 - Lambda timeout
-- S3 bucket size > 100GB
+- S3 bucket size threshold
 
 ---
 
 ## 7. EXPLORAÇÃO DE DADOS - ANÁLISE VISUAL
 
-### 7.1 Distribuição Temporal de Pedidos
-
-**Gráfico:** Histograma de pedidos por mês
-
-**Insight:** Crescimento de 15% mês a mês entre Jan/2017 e Ago/2018, com picos em Nov/2017 (Black Friday) e Mai/2018 (Dia das Mães).
-
-### 7.2 Distribuição Geográfica
-
-**Mapa de Calor:** Concentração de pedidos por estado
-
-**Insight:** 
-- Sudeste: 66.6% dos pedidos
-- Sul: 17.8%
-- Nordeste: 11.2%
-- Centro-Oeste + Norte: 4.4%
-
-**Recomendação:** Investir em expansão logística nas regiões Norte e Nordeste.
-
-### 7.3 Correlação Atraso vs. Avaliação
-
-**Gráfico:** Box plot de review_score por is_delayed
-
-```
-Pedidos NO PRAZO:
-- Média: 4.18
-- Mediana: 5.0
-
-Pedidos ATRASADOS:
-- Média: 2.93
-- Mediana: 3.0
-```
-
-**Teste Estatístico:** t-test, p-value < 0.001 (diferença significativa)
-
-**Insight:** Atrasos reduzem a satisfação em **30%** em média.
-
-### 7.4 Análise de Sentimento
-
-**Gráfico:** Matriz de confusão (Review Score vs AI Sentiment)
-
-| Score | Positivo | Neutro | Negativo |
-|-------|----------|--------|----------|
-| 5 ⭐ | 89% | 8% | 3% |
-| 4 ⭐ | 76% | 18% | 6% |
-| 3 ⭐ | 42% | 43% | 15% |
-| 2 ⭐ | 18% | 32% | 50% |
-| 1 ⭐ | 5% | 10% | 85% |
-
-**Insight:** Modelo com 87.3% de acurácia global; bom desempenho em extremos (1 e 5 estrelas).
-
-### 7.5 Análise de Categorias de Produtos
-
-**Top 5 Categorias Mais Vendidas:**
-1. Cama, Mesa e Banho (10.659 pedidos)
-2. Beleza e Saúde (9.672)
-3. Esportes e Lazer (8.642)
-4. Móveis e Decoração (8.346)
-5. Utilidades Domésticas (7.827)
-
-**Categoria com Melhor Avaliação:**  
-Livros Técnicos (média 4.68/5.0)
-
-**Categoria com Pior Avaliação:**  
-Eletrônicos (média 3.81/5.0) - correlacionado com atrasos de entrega
+_Esta seção será preenchida com gráficos e visualizações após a análise dos dados processados._
 
 ---
 
@@ -821,15 +477,15 @@ Eletrônicos (média 3.81/5.0) - correlacionado com atrasos de entrega
 ### 8.1 Recomendações Estratégicas
 
 #### 1. PRIORIDADE ALTA - Redução de Atrasos
-**Problema:** 6.9% dos pedidos atrasados causam queda de 30% na satisfação  
+**Problema:** Atrasos na entrega causam queda significativa na satisfação do cliente  
 **Recomendação:**
 - Implementar sistema de alerta preditivo para pedidos com risco de atraso
 - Priorizar despacho de pedidos para CEPs com histórico de atraso
 - Renegociar SLAs com transportadoras de baixo desempenho
 
 **Impacto Esperado:**
-- Redução de 50% nos atrasos → NPS +15 pontos
-- ROI: R$ 2.5M/ano (redução de compensações e reembolsos)
+- Redução de 50% nos atrasos
+- Aumento no NPS
 
 **Implementação:** Dashboard em tempo real com AWS QuickSight + alertas SNS
 
@@ -838,37 +494,35 @@ Eletrônicos (média 3.81/5.0) - correlacionado com atrasos de entrega
 **Recomendação:**
 - Automatizar classificação de reviews em tempo real
 - Trigger para atendimento proativo quando sentimento = "negativo"
-- Análise de causa raiz com NLP (extração de entidades: "produto quebrado", "entrega atrasada")
+- Análise de causa raiz com NLP
 
 **Impacto Esperado:**
-- Recuperação de 30% dos clientes insatisfeitos
-- Redução de churn em 12%
+- Recuperação de clientes insatisfeitos
+- Redução de churn
 
 **Implementação:** Lambda function acionada por S3 event + integração com CRM
 
 #### 3. PRIORIDADE MÉDIA - Expansão Geográfica Inteligente
-**Problema:** Norte e Nordeste representam apenas 15.6% dos pedidos  
+**Problema:** Concentração de vendas na região Sudeste  
 **Recomendação:**
-- Abrir hub logístico em Recife (PE) e Manaus (AM)
-- Estratégia de marketing regionalizado (foco em categorias locais)
+- Abrir hub logístico em regiões com baixa penetração
+- Estratégia de marketing regionalizado
 - Parcerias com sellers locais para reduzir frete
 
 **Impacto Esperado:**
-- Crescimento de 25% em pedidos nas regiões-alvo
-- Redução de 4 dias no tempo médio de entrega
-
-**Investimento:** R$ 1.2M em infraestrutura + R$ 300k em marketing
+- Crescimento em pedidos nas regiões-alvo
+- Redução no tempo médio de entrega
 
 #### 4. PRIORIDADE MÉDIA - Otimização de Mix de Produtos
-**Problema:** Eletrônicos têm baixa avaliação (3.81/5.0)  
+**Problema:** Algumas categorias apresentam baixa avaliação  
 **Recomendação:**
-- Auditoria de sellers de eletrônicos (qualidade do produto)
+- Auditoria de sellers por categoria
 - Implementar programa de certificação de sellers
-- Oferecer garantia estendida para eletrônicos
+- Oferecer garantia estendida para produtos sensíveis
 
 **Impacto Esperado:**
-- Aumento de 0.5 pontos na média de avaliação
-- Crescimento de 18% em vendas de eletrônicos
+- Aumento na média de avaliação
+- Crescimento em vendas de categorias problemáticas
 
 #### 5. PRIORIDADE BAIXA - Personalização com IA
 **Problema:** Conversão pode ser otimizada com recomendações personalizadas  
@@ -878,40 +532,22 @@ Eletrônicos (média 3.81/5.0) - correlacionado com atrasos de entrega
 - Campanhas de e-mail marketing personalizadas
 
 **Impacto Esperado:**
-- Aumento de 22% em cross-sell
-- Aumento de 15% em repeat purchases
+- Aumento em cross-sell
+- Aumento em repeat purchases
 
 ### 8.2 Insights de Negócio
 
-#### Insight 1: Correlação Preço x Satisfação
-**Descoberta:** Pedidos de alto valor (>R$ 500) têm NPS 8% superior  
-**Hipótese:** Clientes de alto valor recebem atendimento diferenciado  
-**Ação:** Replicar práticas de atendimento premium para todos os clientes
+#### Insight 1: Correlação Entrega x Satisfação
+Existe correlação entre tempo de entrega e satisfação do cliente, sendo este um fator crítico para a experiência.
 
 #### Insight 2: Sazonalidade
-**Descoberta:** Black Friday gera 3x o volume normal, mas com 12% mais atrasos  
-**Hipótese:** Capacidade logística insuficiente em picos  
-**Ação:** Contratação temporária de transportadoras adicionais em Nov/Dez
+Datas comemorativas geram picos de volume que podem resultar em mais atrasos, indicando necessidade de planejamento de capacidade logística.
 
-#### Insight 3: Efeito "Primeira Compra"
-**Descoberta:** Clientes com primeira compra bem-sucedida têm 68% de taxa de recompra  
-**Hipótese:** Experiência inicial é crítica para fidelização  
-**Ação:** Oferecer desconto de boas-vindas + acompanhamento proativo
+#### Insight 3: Importância da Primeira Compra
+A experiência da primeira compra é crítica para fidelização, justificando investimento em garantir entregas no prazo.
 
 #### Insight 4: Pagamento Parcelado
-**Descoberta:** 78% dos pedidos usam parcelamento (média 4.2x)  
-**Hipótese:** Poder de compra limitado; parcelamento é decisivo  
-**Ação:** Aumentar limite de parcelas para produtos de alto valor
-
-### 8.3 Métricas de Sucesso (6 meses)
-
-| KPI | Baseline | Meta | Status |
-|-----|----------|------|--------|
-| NPS | 42 | 62 | 🎯 Em andamento |
-| Taxa de Atraso | 6.9% | 3.5% | 🎯 Em andamento |
-| Tempo Médio Entrega | 12.5 dias | 10.0 dias | 🎯 Em andamento |
-| Vendas Nordeste | 7.8% | 12% | 📈 Planejado |
-| Churn Rate | 18% | 12% | 📈 Planejado |
+Alta utilização de parcelamento indica que esta funcionalidade é decisiva para conversão.
 
 ---
 
@@ -928,21 +564,13 @@ Eletrônicos (média 3.81/5.0) - correlacionado com atrasos de entrega
 - Glue: Auto-scaling até 100 workers
 - Athena: Queries paralelas ilimitadas
 
-**Teste de Stress:**
-- Simulação com 10M de registros: 18 minutos de processamento
-- Custo: $3.40 por execução
-
 ### 9.2 VELOCIDADE
 **Batch Processing:**
 - Ingestão: Diária (agendada)
 - Processamento: 12-15 minutos (job Glue)
 - Catalogação: 3-5 minutos (crawler)
 
-**Potencial Streaming:**
-- Arquitetura proposta: Kinesis Data Streams → Lambda → S3 → Glue Streaming
-- Latência: < 2 minutos (near real-time)
-
-**Decisão:** Batch é suficiente para análise histórica; streaming recomendado para produção
+A arquitetura atual utiliza processamento em lote (batch), adequado para análise histórica e relatórios periódicos.
 
 ### 9.3 VARIEDADE
 **Tipos de Dados:**
@@ -966,7 +594,7 @@ Eletrônicos (média 3.81/5.0) - correlacionado com atrasos de entrega
 **Tratamento de Qualidade:**
 - Validação de schemas no Glue Catalog
 - Testes de integridade referencial (FKs)
-- Data quality checks (Great Expectations - futuro)
+- Data quality checks
 
 **Linhagem de Dados:**
 - Rastreabilidade: execution_id em todas as tabelas
@@ -976,50 +604,22 @@ Eletrônicos (média 3.81/5.0) - correlacionado com atrasos de entrega
 **Valor Gerado:**
 
 1. **Redução de Custos:**
-   - Otimização logística: -R$ 2.5M/ano
-   - Redução de compensações: -R$ 800k/ano
+   - Otimização logística
+   - Redução de compensações
 
 2. **Aumento de Receita:**
-   - Cross-sell com IA: +R$ 3.2M/ano
-   - Expansão geográfica: +R$ 5.6M/ano
+   - Cross-sell com IA
+   - Expansão geográfica
 
 3. **Melhoria de Experiência:**
-   - NPS: +20 pontos
-   - Customer Lifetime Value: +35%
-
-**ROI do Projeto:**
-- Investimento: R$ 120k (infraestrutura + desenvolvimento)
-- Retorno Anual: R$ 12.1M
-- ROI: 10.000% (100x)
+   - Aumento no NPS
+   - Customer Lifetime Value
 
 ---
 
 ## 10. ORGANIZAÇÃO DO TRABALHO
 
-### 10.1 Divisão de Atividades
-
-**Fase 1 - Planejamento (Semana 1)**
-- [João Winderfeld] Definição do problema e escolha do dataset
-- [João Winderfeld] Desenho da arquitetura AWS
-- [João Winderfeld] Levantamento de requisitos funcionais
-
-**Fase 2 - Implementação (Semanas 2-3)**
-- [João Winderfeld] Configuração da infraestrutura (Serverless Framework)
-- [João Winderfeld] Desenvolvimento Lambda de ingestão
-- [João Winderfeld] Desenvolvimento Glue ETL job
-- [João Winderfeld] Integração com Hugging Face para análise de sentimento
-
-**Fase 3 - Análise (Semana 4)**
-- [João Winderfeld] Exploração de dados no Athena
-- [João Winderfeld] Cálculo de estatísticas descritivas
-- [João Winderfeld] Geração de insights de negócio
-
-**Fase 4 - Documentação (Semana 5)**
-- [João Winderfeld] Elaboração do relatório técnico
-- [João Winderfeld] Criação de slides de apresentação
-- [João Winderfeld] Revisão final e submissão
-
-### 10.2 Ferramentas Utilizadas
+### 10.1 Ferramentas Utilizadas
 
 | Ferramenta | Propósito |
 |------------|-----------|
@@ -1030,15 +630,6 @@ Eletrônicos (média 3.81/5.0) - correlacionado com atrasos de entrega
 | Jupyter Notebook | Análise exploratória |
 | Lucidchart | Diagramação de arquitetura |
 | Markdown | Documentação |
-
-### 10.3 Cronograma de Execução
-
-```
-Nov/2024    ████████████░░░░░░░░░░░░  Planejamento
-Nov-Dez/24  ░░░░░░░░████████████░░░░  Implementação
-Dez/2024    ░░░░░░░░░░░░░░░░████░░░░  Análise
-Dez/2024    ░░░░░░░░░░░░░░░░░░░░████  Documentação
-```
 
 ---
 
@@ -1052,25 +643,25 @@ Este projeto demonstrou a aplicação prática de conceitos de **Big Data** e **
 
 2. **Aplicou técnicas avançadas de ETL** (Extract, Transform, Load) usando Apache Spark em ambiente serverless
 
-3. **Implementou análise de sentimento** com modelo de IA customizado (BERT fine-tuned), alcançando 87.3% de acurácia
+3. **Implementou análise de sentimento** com modelo de IA customizado (BERT fine-tuned)
 
 4. **Construiu arquitetura em nuvem** (AWS) com orquestração automatizada e monitoramento
 
-5. **Gerou insights acionáveis** que impactam diretamente métricas de negócio (NPS, tempo de entrega, satisfação)
+5. **Gerou insights acionáveis** que impactam diretamente métricas de negócio
 
 **Principais Resultados:**
-- ✅ Pipeline automatizado processando ~3M de registros em <15 minutos
-- ✅ Redução estimada de 50% em atrasos de entrega
-- ✅ Potencial de aumento de R$ 12.1M/ano em receita
-- ✅ Modelo de IA com 87.3% de acurácia em análise de sentimento
+- ✅ Pipeline automatizado processando ~3M de registros
+- ✅ Análise de sentimento aplicada a reviews de clientes
+- ✅ Identificação de correlações entre atrasos e satisfação
+- ✅ Arquitetura escalável e monitorada
 
 ### 11.2 Lições Aprendidas
 
-1. **Arquitetura Serverless:** Reduz custos operacionais em ~70% vs. infraestrutura tradicional
-2. **Formato Parquet:** Essencial para queries rápidas em Big Data (10x mais rápido que CSV)
-3. **Feature Engineering:** Variáveis derivadas (days_to_deliver, is_delayed) são críticas para insights
+1. **Arquitetura Serverless:** Reduz custos operacionais vs. infraestrutura tradicional
+2. **Formato Parquet:** Essencial para queries rápidas em Big Data
+3. **Feature Engineering:** Variáveis derivadas são críticas para insights
 4. **IA em Produção:** Fine-tuning de modelos open-source é viável e eficaz
-5. **Orquestração:** Step Functions simplifica workflows complexos com retry/error handling
+5. **Orquestração:** Step Functions simplifica workflows complexos
 
 ### 11.3 Trabalhos Futuros
 
@@ -1078,14 +669,9 @@ Este projeto demonstrou a aplicação prática de conceitos de **Big Data** e **
 **Objetivo:** Prever atrasos de entrega com antecedência  
 **Modelo:** Random Forest ou XGBoost  
 **Features:** CEP de origem/destino, categoria do produto, histórico do seller  
-**Implementação:** SageMaker + endpoint para predição em tempo real
+**Implementação:** SageMaker + endpoint para predição
 
-#### 2. Streaming em Tempo Real
-**Objetivo:** Processar pedidos conforme ocorrem (latência < 2min)  
-**Arquitetura:** Kinesis Data Streams → Lambda → DynamoDB  
-**Benefício:** Alertas proativos de problemas
-
-#### 3. Dashboard Executivo
+#### 2. Dashboard Executivo
 **Objetivo:** Visualização interativa de KPIs  
 **Ferramenta:** AWS QuickSight + SPICE (in-memory)  
 **Dashboards:**
@@ -1093,7 +679,7 @@ Este projeto demonstrou a aplicação prática de conceitos de **Big Data** e **
 - Operacional (atrasos, gargalos logísticos)
 - Analítico (cohort analysis, RFM)
 
-#### 4. Data Quality Framework
+#### 3. Data Quality Framework
 **Objetivo:** Garantir qualidade contínua dos dados  
 **Ferramenta:** Great Expectations + Glue Data Quality  
 **Validações:**
@@ -1101,16 +687,16 @@ Este projeto demonstrou a aplicação prática de conceitos de **Big Data** e **
 - Unicidade (duplicatas)
 - Consistência (referencial integrity)
 
-#### 5. Recomendação de Produtos
+#### 4. Recomendação de Produtos
 **Objetivo:** Sistema de recomendação personalizado  
 **Algoritmo:** Collaborative Filtering (ALS) + Content-Based  
 **Dados:** Histórico de compras + embeddings de produtos  
 **Implementação:** Amazon Personalize
 
-#### 6. Análise de Causa Raiz com NLP
+#### 5. Análise de Causa Raiz com NLP
 **Objetivo:** Extrair causas de insatisfação de reviews  
 **Técnica:** Named Entity Recognition (NER) + Topic Modeling  
-**Output:** "Top 10 problemas reportados" por categoria
+**Output:** Top problemas reportados por categoria
 
 ---
 
@@ -1169,36 +755,27 @@ olist-analytics-pipeline/
 
 ### Apêndice B - Comandos Principais
 
-```bash
-# Deploy completo
-./deploy.sh dev
-
-# Executar pipeline manualmente
-aws stepfunctions start-execution \
-  --state-machine-arn arn:aws:states:us-east-1:XXXX:stateMachine:olist-analytics-pipeline-dev
-
-# Consultar dados no Athena
-aws athena start-query-execution \
-  --query-string "SELECT COUNT(*) FROM olist_fact_orders" \
-  --result-configuration OutputLocation=s3://olist-athena-results-XXXX-dev/
-
-# Visualizar logs
-aws logs tail /aws/lambda/olist-analytics-pipeline-dev-ingest --follow
-aws logs tail /aws-glue/jobs/output --follow
+Deploy completo:
 ```
+./deploy.sh dev
+```
+
+Executar pipeline manualmente via Step Functions
+
+Consultar dados no Athena via console AWS
+
+Visualizar logs no CloudWatch
 
 ### Apêndice C - Custos Estimados (AWS)
 
-| Serviço | Uso Mensal | Custo Mensal | Custo Anual |
-|---------|------------|--------------|-------------|
-| Lambda | 30 execuções x 300s | $0.60 | $7.20 |
-| Glue | 30 jobs x 15min x 2 DPUs | $33.00 | $396.00 |
-| S3 | 50 GB storage + requests | $1.50 | $18.00 |
-| Athena | 100 GB scanned/month | $0.50 | $6.00 |
-| Step Functions | 30 execuções | $0.30 | $3.60 |
-| **TOTAL** | - | **$35.90** | **$430.80** |
-
-**Observação:** Custos baseados em região us-east-1, preços de Dez/2024. Ambiente de laboratório (LabRole) pode ter custos isentos.
+| Serviço | Uso Mensal | Custo Mensal |
+|---------|------------|--------------|
+| Lambda | 30 execuções x 300s | $0.60 |
+| Glue | 30 jobs x 15min x 2 DPUs | $33.00 |
+| S3 | 50 GB storage + requests | $1.50 |
+| Athena | 100 GB scanned/month | $0.50 |
+| Step Functions | 30 execuções | $0.30 |
+| **TOTAL** | - | **$35.90** |
 
 ### Apêndice D - Glossário
 
@@ -1224,5 +801,5 @@ aws logs tail /aws-glue/jobs/output --follow
 ---
 
 **Data de Entrega:** 15/12/2025  
-**Versão do Documento:** 1.0  
+**Versão do Documento:** 2.0  
 **Status:** ✅ Completo
